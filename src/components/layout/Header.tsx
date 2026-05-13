@@ -13,8 +13,21 @@ import {
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { logout } from "@/app/actions/auth"
 
-export function Header() {
+export function Header({ currentUser }: { currentUser: any }) {
+
+  const handleLogout = async () => {
+    await logout()
+  }
+
+  const initials = currentUser?.name
+    ?.split(' ')
+    .map(n => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2) || 'U'
+
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-zinc-800 bg-zinc-950/80 px-6 backdrop-blur-md">
       <Button variant="ghost" size="icon" className="md:hidden shrink-0 text-zinc-400 hover:text-zinc-100">
@@ -41,19 +54,22 @@ export function Header() {
         <DropdownMenu>
           <DropdownMenuTrigger className="rounded-full ring-2 ring-transparent focus-visible:ring-indigo-500 transition-all outline-none">
             <Avatar className="size-8 hover:opacity-80 transition-opacity">
-              <AvatarImage src="https://github.com/shadcn.png" alt="Admin" />
-              <AvatarFallback className="bg-indigo-500 text-white">AD</AvatarFallback>
+              <AvatarImage src={currentUser?.avatar} alt={currentUser?.name || 'User'} />
+              <AvatarFallback className="bg-indigo-500 text-white text-xs font-bold">{initials}</AvatarFallback>
             </Avatar>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56 bg-zinc-900 border-zinc-800 text-zinc-100">
             <DropdownMenuGroup>
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuLabel className="flex flex-col">
+                <span className="font-semibold">{currentUser?.name}</span>
+                <span className="text-xs text-zinc-500 font-normal">{currentUser?.email}</span>
+              </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator className="bg-zinc-800" />
             <DropdownMenuItem className="focus:bg-zinc-800 focus:text-zinc-100 cursor-pointer">Profile</DropdownMenuItem>
-            <DropdownMenuItem className="focus:bg-zinc-800 focus:text-zinc-100 cursor-pointer">Settings</DropdownMenuItem>
+            <DropdownMenuItem className="focus:bg-zinc-800 focus:text-zinc-100 cursor-pointer" onClick={() => router.push('/settings')}>Settings</DropdownMenuItem>
             <DropdownMenuSeparator className="bg-zinc-800" />
-            <DropdownMenuItem className="text-red-400 focus:bg-red-500/10 focus:text-red-400 cursor-pointer">Log out</DropdownMenuItem>
+            <DropdownMenuItem className="text-red-400 focus:bg-red-500/10 focus:text-red-400 cursor-pointer" onClick={handleLogout}>Log out</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

@@ -1,43 +1,62 @@
-"use client"
-
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { ArrowUpRight, ArrowDownRight, DollarSign, Users, Briefcase, CreditCard, Receipt, TrendingUp, Activity, Info, AlertTriangle, AlertCircle, Quote, Target, Star, Smile } from "lucide-react"
+import { ArrowUpRight, ArrowDownRight, DollarSign, Users, Briefcase, CreditCard, Receipt, TrendingUp, Activity, Info, AlertTriangle, AlertCircle, Quote, Target, Star, Smile, Globe } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { useStore } from "@/lib/store"
-import { useEffect, useState } from "react"
+import { cn, formatDate } from "@/lib/utils"
+import { createClient } from "@/lib/supabase/server"
+import { getCurrentUser } from "@/app/actions/auth"
 
-export default function DashboardPage() {
-  const { clients, projects, ledgers, expenses, currentUser } = useStore()
-  const [motivation, setMotivation] = useState("")
+export default async function DashboardPage() {
+  const supabase = await createClient()
+  const currentUser = await getCurrentUser()
+  
+  if (!currentUser) return null
 
-  useEffect(() => {
-    const quotes = [
-      "Your hard work today is building the TechVilo of tomorrow!",
-      "Success is not final, failure is not fatal: it is the courage to continue that counts.",
-      "Every project you finish brings us one step closer to our vision.",
-      "Focus on being productive instead of busy.",
-      "Small daily improvements are the key to staggering long-term results.",
-      "The only way to do great work is to love what you do.",
-      "Believe you can and you're halfway there.",
-      "Don't stop when you're tired. Stop when you're done."
-    ]
-    setMotivation(quotes[Math.floor(Math.random() * quotes.length)])
-  }, [])
+  // Fetch all required data from Supabase
+  const [
+    clientsRes,
+    projectsRes,
+    ledgersRes,
+    expensesRes,
+    adSupportRes
+  ] = await Promise.all([
+    supabase.from('clients').select('*').order('created_at', { ascending: false }),
+    supabase.from('projects').select('*').order('created_at', { ascending: false }),
+    supabase.from('ledgers').select('*').order('created_at', { ascending: false }),
+    supabase.from('expenses').select('*').order('date', { ascending: false }),
+    supabase.from('ad_support').select('*').order('date', { ascending: false })
+  ])
 
-  if (currentUser?.role === 'Staff') {
+  const clients = clientsRes.data || []
+  const projects = projectsRes.data || []
+  const ledgers = ledgersRes.data || []
+  const expenses = expensesRes.data || []
+  const adSupport = adSupportRes.data || []
+
+  const quotes = [
+    "Your hard work today is building the TechVilo of tomorrow!",
+    "Success is not final, failure is not fatal: it is the courage to continue that counts.",
+    "Every project you finish brings us one step closer to our vision.",
+    "Focus on being productive instead of busy.",
+    "Small daily improvements are the key to staggering long-term results.",
+    "The only way to do great work is to love what you do.",
+    "Believe you can and you're halfway there.",
+    "Don't stop when you're tired. Stop when you're done."
+  ]
+  const motivation = quotes[Math.floor(Math.random() * quotes.length)]
+
+  if (currentUser.role === 'Staff') {
     // STAFF DASHBOARD VIEW - Ownership Based Filtering
-    const myProjects = projects.filter(p => (p as any).createdBy === currentUser.id && (p.status === 'Active' || p.status === 'In Progress'))
-    const myAllProjects = projects.filter(p => (p as any).createdBy === currentUser.id)
-    const myCompletedProjects = projects.filter(p => (p as any).createdBy === currentUser.id && p.status === 'Completed').length
+    const myAllProjects = (projects || []).filter(p => p.created_by === currentUser.id)
+    const myProjects = myAllProjects.filter(p => (p.status === 'Active' || p.status === 'In Progress'))
+    const myCompletedProjects = myAllProjects.filter(p => p.status === 'Completed').length
     
-    // Efficiency calculation (just for show, but based on data)
+    // Efficiency calculation
     const myEfficiency = myAllProjects.length > 0 ? `${Math.round((myCompletedProjects / myAllProjects.length) * 100)}%` : "0%"
     
-    // Revenue Contribution: Sum of paid amounts from projects owned by staff
-    const myRevenueContribution = myAllProjects.reduce((sum, p) => sum + p.paidAmount, 0)
+    // Revenue Contribution
+    const myRevenueContribution = myAllProjects.reduce((sum, p) => sum + (Number(p.paid_amount) || 0), 0)
     
-    // Mocked cost impact (e.g. 15% of revenue for overhead)
     const myCostImpact = Math.round(myRevenueContribution * 0.15)
     const myNetContribution = myRevenueContribution - myCostImpact
 
@@ -57,7 +76,6 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid gap-6 md:grid-cols-3">
-          {/* Personal KPI Card */}
           <Card className="bg-zinc-900 border-zinc-800 border-t-4 border-t-blue-500">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-zinc-400 flex items-center gap-2">
@@ -78,8 +96,8 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-4xl font-bold text-white">{myEfficiency}</div>
-              <p className="text-xs text-emerald-500 mt-2 font-medium flex items-center gap-1">
-                <TrendingUp className="size-3" /> +2% from last month
+              <p className="text-xs text-zinc-500 mt-2">
+                {myCompletedProjects} of {myAllProjects.length} projects completed
               </p>
             </CardContent>
           </Card>
@@ -87,7 +105,7 @@ export default function DashboardPage() {
           <Card className="bg-zinc-900 border-zinc-800 border-t-4 border-t-purple-500">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-zinc-400 flex items-center gap-2">
-                <Activity className="size-4 text-purple-400" /> Completed This Year
+                <Activity className="size-4 text-purple-400" /> Completed Projects
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -98,7 +116,6 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
-          {/* Contribution Card */}
           <Card className="bg-zinc-900 border-zinc-800 overflow-hidden group">
             <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             <CardHeader>
@@ -123,13 +140,9 @@ export default function DashboardPage() {
                 </div>
                 <div className="text-2xl font-black text-indigo-400">৳ {myNetContribution.toLocaleString()}</div>
               </div>
-              <p className="text-xs text-zinc-500 italic text-center">
-                * This represents the profit the company made directly through your handled projects.
-              </p>
             </CardContent>
           </Card>
 
-          {/* Current Tasks/Projects Table */}
           <Card className="bg-zinc-900 border-zinc-800">
             <CardHeader>
               <CardTitle className="text-zinc-100">My Projects</CardTitle>
@@ -137,17 +150,26 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {myProjects.map(project => (
-                  <div key={project.id} className="flex items-center justify-between p-3 rounded-lg border border-zinc-800 bg-zinc-950/30 hover:bg-zinc-800/50 transition-colors">
-                    <div>
-                      <p className="font-medium text-zinc-200">{project.name}</p>
-                      <p className="text-xs text-zinc-500">{project.client}</p>
-                    </div>
-                    <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/20">
-                      {project.status}
-                    </Badge>
+                {myProjects.length === 0 ? (
+                  <div className="text-center py-8 text-zinc-500">
+                    No active projects assigned to you yet.
                   </div>
-                ))}
+                ) : (
+                  myProjects.map(project => {
+                    const client = (clients || []).find(c => c.id === project.client_id)
+                    return (
+                      <div key={project.id} className="flex items-center justify-between p-3 rounded-lg border border-zinc-800 bg-zinc-950/30 hover:bg-zinc-800/50 transition-colors">
+                        <div>
+                          <p className="font-medium text-zinc-200">{project.name}</p>
+                          <p className="text-xs text-zinc-500">{client?.company || 'N/A'}</p>
+                        </div>
+                        <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/20">
+                          {project.status}
+                        </Badge>
+                      </div>
+                    )
+                  })
+                )}
               </div>
             </CardContent>
           </Card>
@@ -156,27 +178,34 @@ export default function DashboardPage() {
     )
   }
 
-  // ADMIN/MANAGER DASHBOARD VIEW (Current View)
-  const totalRevenue = ledgers.reduce((acc, curr) => acc + curr.paidAmount, 0)
-  const totalExpenses = expenses?.reduce((acc, curr) => acc + curr.amount, 0) || 0
+  // ADMIN/MANAGER DASHBOARD VIEW
+  const totalRevenue = (ledgers || []).reduce((acc, curr) => acc + (Number(curr.paid_amount) || 0), 0)
+  const totalExpenses = (expenses || []).reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0)
   const netProfit = totalRevenue - totalExpenses
   
-  const totalDue = ledgers.reduce((acc, curr) => acc + curr.dueAmount, 0)
-  const activeProjects = projects.filter(p => p.status === 'Active' || p.status === 'In Progress').length
-  const totalClients = clients.length
+  const totalDue = (ledgers || []).reduce((acc, curr) => acc + (Number(curr.due_amount) || 0), 0)
+  const activeProjects = (projects || []).filter(p => p.status === 'Active' || p.status === 'In Progress').length
+  const totalClientsCount = (clients || []).length
+  const totalAdSupportBdt = (adSupport || []).reduce((acc: number, curr: any) => acc + (Number(curr.total_bdt) || 0), 0)
+  const totalAdSupportUsd = (adSupport || []).reduce((acc: number, curr: any) => acc + (Number(curr.dollar_amount) || 0), 0)
+  const totalAdSupportDue = (adSupport || []).reduce((acc: number, curr: any) => acc + (Number(curr.due_amount) || 0), 0)
 
-  const recentIncome = ledgers.filter(l => l.paidAmount > 0).map(l => {
-    const clientName = clients.find(c => c.id === l.clientId)?.company || 'Unknown Client'
+  const pendingInvoices = (ledgers || []).filter(l => (Number(l.due_amount) || 0) > 0).length
+  const activeClientCount = (clients || []).filter(c => c.status === 'Active').length
+
+  const recentIncome = (ledgers || []).filter(l => (Number(l.paid_amount) || 0) > 0).map(l => {
+    const clientName = clients?.find(c => c.id === l.client_id)?.company || 'Unknown Client'
+    const project = (projects || []).find(p => p.id === l.project_id)
     return {
       id: `inc-${l.id}`,
-      date: l.payDate,
-      description: l.project,
+      date: l.pay_date || l.created_at.split('T')[0],
+      description: project?.name || 'Payment',
       client: clientName,
-      amount: l.paidAmount
+      amount: Number(l.paid_amount) || 0
     }
   }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10)
 
-  const recentExpenses = [...expenses].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10)
+  const recentExpenses = (expenses || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10)
 
   const profitMargin = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : 0
   
@@ -192,17 +221,17 @@ export default function DashboardPage() {
     alertClass = "bg-blue-500/10 text-blue-400 border-blue-500/20"
   } else if (netProfit < 0) {
     healthTitle = "Critical: Operating at a Loss"
-    healthDescription = `Your expenses exceed your revenue by ৳ ${Math.abs(netProfit).toLocaleString()}. Focus on collecting the ৳ ${totalDue.toLocaleString()} in due payments and reducing overhead costs.`
+    healthDescription = `Your expenses exceed your revenue by ৳ ${Math.abs(netProfit).toLocaleString()}. Focus on collecting the ৳ ${totalDue.toLocaleString()} in due payments.`
     AlertIcon = AlertTriangle
     alertClass = "bg-rose-500/10 text-rose-400 border-rose-500/20"
   } else if (netProfit > 0 && Number(profitMargin) < 20) {
     healthTitle = "Warning: Low Profit Margin"
-    healthDescription = `You are profitable, but your margin is only ${profitMargin}%. Try to optimize your operational expenses to increase profitability.`
+    healthDescription = `You are profitable, but your margin is only ${profitMargin}%. Try to optimize your operational expenses.`
     AlertIcon = AlertCircle
     alertClass = "bg-amber-500/10 text-amber-400 border-amber-500/20"
   } else {
     healthTitle = "Excellent: Healthy Business"
-    healthDescription = `Your business is operating with a solid ${profitMargin}% profit margin. Keep up the great work in maintaining revenue streams!`
+    healthDescription = `Your business is operating with a solid ${profitMargin}% profit margin. Keep up the great work!`
     AlertIcon = TrendingUp
     alertClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
   }
@@ -216,7 +245,7 @@ export default function DashboardPage() {
         </div>
         <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 p-2 rounded-lg">
           <div className="size-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold text-white">
-            {currentUser?.name.charAt(0)}
+            {currentUser?.name?.charAt(0)}
           </div>
           <div>
             <p className="text-xs font-bold text-white leading-tight">{currentUser?.name}</p>
@@ -225,7 +254,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Business Health AI Insight */}
       <div className={`flex items-start gap-3 p-4 rounded-lg border ${alertClass}`}>
         <AlertIcon className="size-5 mt-0.5 shrink-0" />
         <div>
@@ -235,7 +263,6 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
-        {/* Total Revenue */}
         <Card className="bg-zinc-900 border-zinc-800 text-zinc-100 overflow-hidden relative group">
           <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 relative z-10">
@@ -253,7 +280,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Total Expenses */}
         <Card className="bg-zinc-900 border-zinc-800 text-zinc-100 overflow-hidden relative group">
           <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 relative z-10">
@@ -271,7 +297,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Net Profit */}
         <Card className="bg-zinc-900 border-zinc-800 text-zinc-100 overflow-hidden relative group">
           <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 relative z-10">
@@ -281,15 +306,14 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="relative z-10">
-            <div className="text-3xl font-bold text-emerald-400">৳ {netProfit.toLocaleString()}</div>
-            <p className="text-xs text-emerald-400 flex items-center gap-1 mt-1 font-medium">
-              <ArrowUpRight className="size-3" />
-              Net profitability
+            <div className={`text-3xl font-bold ${netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>৳ {netProfit.toLocaleString()}</div>
+            <p className={`text-xs flex items-center gap-1 mt-1 font-medium ${netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {netProfit >= 0 ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
+              {Number(profitMargin) > 0 ? `${profitMargin}% margin` : 'Net profitability'}
             </p>
           </CardContent>
         </Card>
 
-        {/* Due Amount */}
         <Card className="bg-zinc-900 border-zinc-800 text-zinc-100 overflow-hidden relative group">
           <div className="absolute inset-0 bg-gradient-to-br from-rose-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 relative z-10">
@@ -302,12 +326,11 @@ export default function DashboardPage() {
             <div className="text-3xl font-bold text-white">৳ {totalDue.toLocaleString()}</div>
             <p className="text-xs text-rose-400 flex items-center gap-1 mt-1 font-medium">
               <ArrowDownRight className="size-3" />
-              12 invoices pending
+              {pendingInvoices} invoices pending
             </p>
           </CardContent>
         </Card>
 
-        {/* Active Projects */}
         <Card className="bg-zinc-900 border-zinc-800 text-zinc-100 overflow-hidden relative group">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 relative z-10">
@@ -319,12 +342,11 @@ export default function DashboardPage() {
           <CardContent className="relative z-10">
             <div className="text-3xl font-bold text-white">{activeProjects}</div>
             <p className="text-xs text-zinc-500 mt-1">
-              +3 new this week
+              {projects.filter(p => p.status === 'Completed').length} completed total
             </p>
           </CardContent>
         </Card>
 
-        {/* Total Clients */}
         <Card className="bg-zinc-900 border-zinc-800 text-zinc-100 overflow-hidden relative group">
           <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 relative z-10">
@@ -334,18 +356,41 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="relative z-10">
-            <div className="text-3xl font-bold text-white">{totalClients}</div>
+            <div className="text-3xl font-bold text-white">{totalClientsCount}</div>
             <p className="text-xs text-emerald-400 flex items-center gap-1 mt-1 font-medium">
               <ArrowUpRight className="size-3" />
-              +201 since last year
+              {activeClientCount} active clients
             </p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-zinc-900 border-zinc-800 text-zinc-100 overflow-hidden relative group">
+          <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 relative z-10">
+            <CardTitle className="text-sm font-medium text-zinc-400 group-hover:text-zinc-300 transition-colors">Ads Support</CardTitle>
+            <div className="size-8 rounded-full bg-cyan-500/10 flex items-center justify-center text-cyan-400 group-hover:scale-110 transition-transform">
+              <Globe className="size-4" />
+            </div>
+          </CardHeader>
+          <CardContent className="relative z-10">
+            <div className="text-3xl font-bold text-white">$ {totalAdSupportUsd.toLocaleString()}</div>
+            <div className="flex flex-col gap-1 mt-1">
+              <p className="text-xs text-cyan-400 flex items-center gap-1 font-medium">
+                <ArrowUpRight className="size-3" />
+                ৳ {totalAdSupportBdt.toLocaleString()} Volume
+              </p>
+              {totalAdSupportDue > 0 && (
+                <p className="text-[10px] text-rose-400 flex items-center gap-1 font-bold">
+                  <AlertCircle className="size-3" />
+                  ৳ {totalAdSupportDue.toLocaleString()} Due
+                </p>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Recent Financial Activity - Split View */}
       <div className="grid gap-6 md:grid-cols-2 items-start">
-        {/* Recent Income */}
         <Card className="bg-zinc-900 border-zinc-800">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div>
@@ -376,7 +421,7 @@ export default function DashboardPage() {
                     <>
                       {recentIncome.map((item) => (
                         <TableRow key={item.id} className="border-zinc-800 hover:bg-zinc-800/50 transition-colors">
-                          <TableCell className="text-zinc-400">{item.date}</TableCell>
+                          <TableCell className="text-zinc-400">{formatDate(item.date)}</TableCell>
                           <TableCell className="font-medium text-zinc-100">{item.description}</TableCell>
                           <TableCell className="text-zinc-300">{item.client}</TableCell>
                           <TableCell className="text-right font-medium text-emerald-400">
@@ -384,12 +429,6 @@ export default function DashboardPage() {
                           </TableCell>
                         </TableRow>
                       ))}
-                      <TableRow className="border-zinc-800 bg-zinc-950/80 font-bold hover:bg-zinc-950/80">
-                        <TableCell colSpan={3} className="text-zinc-100 text-right">Total Income:</TableCell>
-                        <TableCell className="text-right text-emerald-400">
-                          ৳ {totalRevenue.toLocaleString()}
-                        </TableCell>
-                      </TableRow>
                     </>
                   )}
                 </TableBody>
@@ -398,7 +437,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Recent Expenses */}
         <Card className="bg-zinc-900 border-zinc-800">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div>
@@ -415,7 +453,7 @@ export default function DashboardPage() {
                 <TableHeader className="bg-zinc-950/50">
                   <TableRow className="border-zinc-800 hover:bg-transparent">
                     <TableHead className="text-zinc-400">Date</TableHead>
-                    <TableHead className="text-zinc-400">Title</TableHead>
+                    <TableHead className="text-zinc-400">Description</TableHead>
                     <TableHead className="text-zinc-400">Category</TableHead>
                     <TableHead className="text-zinc-400 text-right">Amount</TableHead>
                   </TableRow>
@@ -429,24 +467,18 @@ export default function DashboardPage() {
                     <>
                       {recentExpenses.map((expense) => (
                         <TableRow key={expense.id} className="border-zinc-800 hover:bg-zinc-800/50 transition-colors">
-                          <TableCell className="text-zinc-400">{expense.date}</TableCell>
-                          <TableCell className="font-medium text-zinc-100">{expense.title}</TableCell>
+                          <TableCell className="text-zinc-400">{formatDate(expense.date)}</TableCell>
+                          <TableCell className="font-medium text-zinc-100">{expense.description}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className="bg-zinc-800/50 text-zinc-300 border-zinc-700">
                               {expense.category}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right font-medium text-orange-400">
-                            - ৳ {expense.amount.toLocaleString()}
+                            - ৳ {Number(expense.amount).toLocaleString()}
                           </TableCell>
                         </TableRow>
                       ))}
-                      <TableRow className="border-zinc-800 bg-zinc-950/80 font-bold hover:bg-zinc-950/80">
-                        <TableCell colSpan={3} className="text-zinc-100 text-right">Total Expenses:</TableCell>
-                        <TableCell className="text-right text-orange-400">
-                          ৳ {totalExpenses.toLocaleString()}
-                        </TableCell>
-                      </TableRow>
                     </>
                   )}
                 </TableBody>

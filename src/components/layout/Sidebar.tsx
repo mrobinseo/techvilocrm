@@ -12,24 +12,24 @@ import {
   ChevronRight,
   Receipt,
   Kanban,
-  LogOut
+  LogOut,
+  Globe,
+  User as UserIcon
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useStore } from "@/lib/store"
+import { logout } from "@/app/actions/auth"
 
-export function Sidebar() {
+export function Sidebar({ currentUser }: { currentUser: any }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { currentUser, logout } = useStore()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  const handleLogout = () => {
-    logout()
-    router.push("/admin")
+  const handleLogout = async () => {
+    await logout()
   }
 
   const navigation = [
@@ -38,8 +38,10 @@ export function Sidebar() {
     { name: 'Pipeline', href: '/clients/pipeline', icon: Kanban, roles: ['Admin', 'Manager', 'Staff'] },
     { name: 'Projects', href: '/projects', icon: Briefcase, roles: ['Admin', 'Manager', 'Staff'] },
     { name: 'Payments', href: '/payments', icon: CreditCard, roles: ['Admin', 'Manager', 'Staff'] },
+    { name: 'Ad Support', href: '/ad-support', icon: Globe, roles: ['Admin', 'Manager', 'Staff'] },
     { name: 'Expenses', href: '/expenses', icon: Receipt, roles: ['Admin'] },
     { name: 'Team Settings', href: '/settings', icon: Settings, roles: ['Admin'] },
+    { name: 'My Profile', href: '/settings/profile', icon: UserIcon, roles: ['Admin', 'Manager', 'Staff'] },
   ]
 
   // Ensure role exists and match exactly. Fallback to empty list if not mounted or no role.
@@ -53,12 +55,9 @@ export function Sidebar() {
   return (
     <div className="flex h-full w-64 shrink-0 flex-col bg-zinc-950 border-r border-zinc-800 text-zinc-100 transition-all duration-300 relative z-40">
       <div className="flex h-16 items-center px-6 border-b border-zinc-800">
-        <div className="flex items-center gap-2 font-bold text-xl tracking-tight">
-          <div className="size-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-            <span className="text-white text-lg">T</span>
-          </div>
-          <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-zinc-400">TechVilo CRM</span>
-        </div>
+        <Link href="/" className="flex items-center">
+          <img src="/logo.png" alt="TechVilo Logo" className="h-100 w-auto object-contain" />
+        </Link>
       </div>
       
       <div className="flex-1 overflow-y-auto py-6 px-3">
@@ -93,7 +92,7 @@ export function Sidebar() {
       <div className="p-4 border-t border-zinc-800 space-y-3">
         <div className="rounded-xl bg-gradient-to-br from-indigo-500/10 to-purple-600/10 border border-indigo-500/20 p-3">
           <div className="flex items-center gap-3 mb-3">
-            <img src={currentUser?.avatar} alt="" className="size-8 rounded-full bg-zinc-800 ring-2 ring-indigo-500/20" />
+            <img src={currentUser?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser?.name}`} alt="" className="size-8 rounded-full bg-zinc-800 ring-2 ring-indigo-500/20" />
             <div className="min-w-0">
               <p className="text-xs font-bold text-white truncate">{currentUser?.name}</p>
               <p className="text-[10px] text-zinc-500 truncate">{currentUser?.role}</p>
